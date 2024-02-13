@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title></title>
+    <style>
+    .container {
+        height: 100vh;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #push-button {
+        height: 80px;
+        width: 350px;
+        background-color: black;
+        color: white;
+        border: 1px;
+        border-radius: 500px;
+        font-size: 24px;
+      }
+    </style>
+</head>
+<body>
+<h2>Firebase Web Push Notification</h2>
+<div class="container">
+    <button id="push-button" disabled>Subscribe</button>
+</div>
+
+<p id="token"></p>
+<p id="BrowserInfo"></p>
+<script src="https://www.gstatic.com/firebasejs/7.14.6/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/7.14.6/firebase-messaging.js"></script>
+<script>
+  //This block initializes Firebase with your project's configuration
+    var firebaseConfig = {
+    apiKey: "AIzaSyARjpDuSsdZuGD0d8grejrGMWgnWkRg2MA",
+    authDomain: "web-pushnotifications-23710.firebaseapp.com",
+    projectId: "web-pushnotifications-23710",
+    storageBucket: "web-pushnotifications-23710.appspot.com",
+    messagingSenderId: "491078645040",
+    appId: "1:491078645040:web:a392281272d6f96d2d04f5"
+    };
+    firebase.initializeApp(firebaseConfig);
+
+    //Creates a messaging instance that allows communication with Firebase Cloud Messaging
+    const messaging = firebase.messaging(),
+    pushBtn   = document.getElementById('push-button')
+    let userToken    = null,
+    isSubscribed = false
+
+/*
+    Checks if the browser supports service workers. 
+    If supported, registers the service worker file (firebase-messaging-sw.js) 
+    for handling push notifications.
+*/
+window.addEventListener('load', () => {
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/firebase-messaging-sw.js')
+            .then(registration => {
+                console.log("userToken:"+userToken)
+                initializePush()
+            })
+            .catch(err => console.log('Service Worker Error', err))
+
+    } else {
+        pushBtn.textContent = 'Push not supported.'
+    }
+
+})
+function initializePush() {
+/*
+    Checks for a saved user token in localStorage. 
+    Updates button text and status based on subscription status.
+    Handles button click events for subscribing or unsubscribing users.
+*/
+    userToken = localStorage.getItem('pushToken')
+    console.log("initializePush() >> userToken:"+userToken)
+    isSubscribed = userToken !== null
+    updateBtn()
+
+pushBtn.addEventListener('click', () => {
+    pushBtn.disabled = true
+
+    if (isSubscribed){ return unsubscribeUser()
+    }else{ return subscribeUser()}
+})
+}
+
+
+function updateBtn() {
+/*
+    Updates the button text and status based on the user's subscription status and notification permission.
+*/
+if (Notification.permission === 'denied') {
+    pushBtn.textContent = 'Subscription blocked'
+    return
+}
+
+pushBtn.textContent = isSubscribed ? 'Unsubscribe' : 'Subscribe'
+pushBtn.disabled = false
+}
+
+function subscribeUser() {
+/*
+    Requests permission from the user to show notifications. 
+    Retrieves the FCM token and updates subscription status and token storage.
+*/
+messaging.requestPermission()
+    .then(() => messaging.getToken())
+    .then(token => {
+        isSubscribed = true
+        userToken = token
+        localStorage.setItem('pushToken', token)
+        updateBtn()
+    })
+    .catch(err => console.log('Denied', err))
+
+}
+
+ messaging.onTokenRefresh(() => {
+     //Listens for token refresh events and updates the stored token securely.
+   messaging.getToken()
+     .then((token) => {
+       console.log('Refreshed FCM Token:', token);
+      localStorage.setItem('pushToken', token);
+     })
+     .catch((error) => {
+       console.error('Error obtaining refreshed token:', error);
+     });
+ });
+function unsubscribeUser() {
+
+    /*
+        Deletes the user's FCM token, updates the subscription status,
+        and removes the token from storage when the user unsubscribes.
+    */
+messaging.deleteToken(userToken)
+    .then(() => {
+        isSubscribed = false
+        userToken = null
+        localStorage.removeItem('pushToken')
+        updateBtn()
+    })
+    .catch(err => console.log('Error unsubscribing', err))
+}
+
+</script>
+</body>
+</html>
